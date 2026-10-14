@@ -7,7 +7,7 @@ library(DT)
 library(plotly)
 
 # ---------------------------------------------------------
-# UI 端
+# UI
 # ---------------------------------------------------------
 mod01_Mantel_ui <- function(id) {
   ns <- NS(id)
@@ -83,7 +83,6 @@ mod01_Mantel_ui <- function(id) {
       
       h4("4. Run Analysis", class = "mt-4"),
       numericInput(ns("nreps"), "Mantel Permutations", value = 1000, min = 100),
-      # 【精确修改】：追加 Skip Mantel 按钮
       div(class = "d-flex gap-2 mt-2",
           actionButton(ns("run_btn"), "Run Mantel Test", class = "btn-primary flex-grow-1"),
           actionButton(ns("skip_btn"), "Send to RTT (Skip Mantel Test)", class = "btn-primary flex-grow-1")
@@ -122,7 +121,7 @@ mod01_Mantel_ui <- function(id) {
 }
 
 # ---------------------------------------------------------
-# Server 端
+# Server 
 # ---------------------------------------------------------
 mod01_Mantel_server <- function(id, global_state) {
   moduleServer(id, function(input, output, session) {
@@ -224,8 +223,6 @@ mod01_Mantel_server <- function(id, global_state) {
       df[info$row, info$col + 1] <- as.numeric(info$value)
       parsed_df_rv(df)
     })
-
-    # 【精确修改】：新增 Skip Mantel 的快速分发通道逻辑
     observeEvent(input$skip_btn, {
       req(raw_seq_data(), parsed_df_rv())
       final_dates <- parsed_df_rv()$Decimal_Year
@@ -234,12 +231,8 @@ mod01_Mantel_server <- function(id, global_state) {
         showNotification("Error: NA values present in Decimal_Year. Please fix them in the table.", type = "error")
         return()
       }
-      
-      # 将树和解析好的日期直接注入全局，免除置换运算
       global_state$phylo_tree <- raw_seq_data()$phy
       global_state$extracted_dates <- final_dates
-      
-      # 消除旧有的 Mantel 状态影响
       global_state$mantel_p_value <- NULL
       global_state$has_confounding <- NULL
       global_state$clusters <- NULL
