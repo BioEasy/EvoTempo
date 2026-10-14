@@ -5,16 +5,13 @@ library(shiny)
 library(bslib)
 
 # ---------------------------------------------------------
-# UI 端：About 页面布局
+# UI
 # ---------------------------------------------------------
 mod05_About_ui <- function(id) {
   ns <- NS(id)
   
   fluidPage(
-    # 限制最大宽度并居中，让阅读体验更像官方文档
     div(class = "container mt-4 mb-5", style = "max-width: 900px;",
-        
-        # 1. Software Introduction (About)
         card(
           class = "border-primary mb-4 shadow-sm",
           card_header(class = "bg-primary text-white font-weight-bold", " About EvoTempo"),
@@ -30,7 +27,6 @@ mod05_About_ui <- function(id) {
           )
         ),
         
-        # 2. Docs & Github
         card(
           class = "border-primary mb-4 shadow-sm",
           card_header(class = "bg-primary text-white font-weight-bold", " Docs & GitHub"),
@@ -43,7 +39,6 @@ mod05_About_ui <- function(id) {
           )
         ),
         
-        # 3. Core Algorithms & References
         card(
           class = "border-primary mb-4 shadow-sm",
           card_header(class = "bg-primary text-white font-weight-bold", " Core Algorithms & References"),
@@ -60,7 +55,6 @@ mod05_About_ui <- function(id) {
           )
         ),
         
-        # 4. Contact & License (并排布局)
         layout_columns(
           col_widths = c(6, 6),
           card(
@@ -85,10 +79,9 @@ mod05_About_ui <- function(id) {
 }
 
 # ---------------------------------------------------------
-# Server 端
+# Server 
 # ---------------------------------------------------------
 mod05_About_server <- function(id) {
   moduleServer(id, function(input, output, session) {
-    # About 页面为纯静态展示，暂不需要 Server 逻辑
   })
 }
