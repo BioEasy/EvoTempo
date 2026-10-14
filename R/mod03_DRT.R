@@ -9,7 +9,7 @@ library(ggplot2)
 library(plotly)
 
 # ---------------------------------------------------------
-# UI 端
+# UI 
 # ---------------------------------------------------------
 mod03_DRT_ui <- function(id) {
   ns <- NS(id)
@@ -43,21 +43,15 @@ mod03_DRT_ui <- function(id) {
             card_body(
               style = "padding: 10px;",
               p("Required to control for temporal and genetic confounding detected in Mantel Test.", style="font-size:0.8em; margin-bottom: 10px;"),
-              
-              # 【关键】Cluster 来源选择：两种模式都在这里切换
               radioButtons(ns("cluster_source"), "Cluster Definition:",
                            choices = c("Upload Metadata CSV" = "csv",
                                        "Auto-cluster (Mclust on dates)" = "mclust"),
                            selected = "csv"),
-              
-              # CSV 上传分支
               conditionalPanel(
                 condition = sprintf("input['%s'] == 'csv'", ns("cluster_source")),
                 fileInput(ns("cluster_csv"), "Upload Cluster Metadata (.csv/.tsv)", accept = c(".csv", ".tsv")),
                 uiOutput(ns("cluster_col_selectors"))
               ),
-              
-              # Mclust 分支
               conditionalPanel(
                 condition = sprintf("input['%s'] == 'mclust'", ns("cluster_source")),
                 p("Mclust will be fitted to the sampling dates of taxa in the XML. Cluster count is selected by BIC over G = 1..N.",
@@ -134,7 +128,7 @@ mod03_DRT_ui <- function(id) {
 }
 
 # ---------------------------------------------------------
-# Server 端
+# Server 
 # ---------------------------------------------------------
 mod03_DRT_server <- function(id, global_state) {
   moduleServer(id, function(input, output, session) {
@@ -200,7 +194,6 @@ mod03_DRT_server <- function(id, global_state) {
           clusters_aligned <- NULL
           
           if (use_clust) {
-            # ---------- 1. 解析 XML 得到 taxa 与 dates ----------
             xml_lines <- readLines(input[["base_xml"]][["datapath"]], warn = FALSE)
             is_beast2 <- any(grepl("<trait.*traitname=\"date(-forward)?\"", xml_lines))
             xml_taxa <- NULL
@@ -230,8 +223,7 @@ mod03_DRT_server <- function(id, global_state) {
                 xml_dates[i] <- as.numeric(sub('.*value="([^"]+)".*', "\\1", xml_lines[date_idx[i]]))
               }
             }
-            
-            # ---------- 2. 按 cluster_source 构建 clusters_aligned ----------
+
             cluster_source <- input[["cluster_source"]]
             
             if (identical(cluster_source, "csv")) {
@@ -279,8 +271,7 @@ mod03_DRT_server <- function(id, global_state) {
               message(sprintf("Mclust selected G = %d (model = %s)", n_found, mclust_fit$modelName))
               
               clusters_aligned <- mclust_fit$classification
-              
-              # 保存 Mclust 结果供留档（可选）
+      
               global_state$mclust_result <- data.frame(
                 Taxon_ID = xml_taxa,
                 Date     = xml_dates,
