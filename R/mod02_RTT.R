@@ -12,7 +12,7 @@ library(dplyr)
 library(stringr)
 
 # ---------------------------------------------------------
-# UI 端
+# UI 
 # ---------------------------------------------------------
 mod02_RTT_ui <- function(id) {
   ns <- NS(id)
@@ -25,8 +25,6 @@ mod02_RTT_ui <- function(id) {
       selectInput(ns("rooting_method"), "Rooting Strategy",
                   choices = c("Minimize Residual Variance (nve-rms)" = "nve-rms",
                               "Maximize Correlation (r)" = "r")),
-
-      # Regression Grouping Strategy
       selectInput(ns("grouping_mode"), "Regression Grouping Strategy",
                   choices = c("Global Regression (Strict Clock)" = "global",
                               "Interactive Clades (Local Clocks)" = "local",
@@ -46,8 +44,6 @@ mod02_RTT_ui <- function(id) {
           )
         )
       ),
-
-      # Trait grouping upload interface
       conditionalPanel(
         condition = sprintf("input['%s'] == 'metadata'", ns("grouping_mode")),
         card(
@@ -118,7 +114,7 @@ mod02_RTT_ui <- function(id) {
 
 
 # ---------------------------------------------------------
-# Server 端
+# Server 
 # ---------------------------------------------------------
 mod02_RTT_server <- function(id, global_state) {
   moduleServer(id, function(input, output, session) {
@@ -164,19 +160,12 @@ mod02_RTT_server <- function(id, global_state) {
         local_clock_counter(1)
       }
     })
-
-
-    # ---------------------------------------------------------
-    # FIX 1: Robust metadata delimiter detection and CSV parsing
-    # ---------------------------------------------------------
     observeEvent(input$trait_csv, {
       req(input$trait_csv)
 
       tryCatch({
 
         file_path <- input$trait_csv$datapath
-
-        # Inspect the header to identify the field delimiter.
         first_line <- readLines(file_path, n = 1, warn = FALSE)
 
         if (length(first_line) == 0 || !nzchar(first_line)) {
@@ -194,8 +183,6 @@ mod02_RTT_server <- function(id, global_state) {
             gregexpr("\t", first_line, fixed = TRUE)
           )
         )
-
-        # Default to comma-separated CSV.
         delimiter <- ","
 
         if (delimiter_counts["semicolon"] >
@@ -211,9 +198,6 @@ mod02_RTT_server <- function(id, global_state) {
 
           delimiter <- "\t"
         }
-
-        # Preserve the original column names. In particular, do not
-        # automatically convert names such as Taxon ID into Taxon.ID.
         df <- utils::read.table(
           file_path,
           header = TRUE,
@@ -224,9 +208,6 @@ mod02_RTT_server <- function(id, global_state) {
           quote = "\"",
           strip.white = TRUE
         )
-
-        # If the first attempt produces only one column, retry common
-        # delimiters. This also handles tab-delimited files named .csv.
         if (ncol(df) == 1) {
 
           alternative_delimiters <- c(",", ";", "\t")
@@ -257,8 +238,6 @@ mod02_RTT_server <- function(id, global_state) {
             }
           }
         }
-
-        # Remove a possible UTF-8 BOM from the first column name.
         if (length(names(df)) > 0) {
           names(df)[1] <- sub(
             "^\ufeff",
@@ -266,12 +245,7 @@ mod02_RTT_server <- function(id, global_state) {
             names(df)[1]
           )
         }
-
-        # Trim accidental whitespace from column names.
         names(df) <- trimws(names(df))
-
-        # A valid metadata file must have separate columns for Taxon ID
-        # and the grouping trait.
         if (ncol(df) < 2) {
           stop(
             paste(
@@ -281,8 +255,6 @@ mod02_RTT_server <- function(id, global_state) {
             )
           )
         }
-
-        # Store the parsed data only after successful validation.
         raw_trait_data(df)
 
         showNotification(
@@ -359,8 +331,6 @@ mod02_RTT_server <- function(id, global_state) {
       }
 
       tips <- phy$tip.label
-
-      # Trim whitespace in IDs before matching.
       metadata_ids <- trimws(as.character(df[[input$trait_taxon_col]]))
       tree_ids <- trimws(as.character(tips))
 
@@ -373,8 +343,6 @@ mod02_RTT_server <- function(id, global_state) {
       mapped_groups[
         is.na(mapped_groups) | trimws(mapped_groups) == ""
       ] <- "Unknown"
-
-      # Map metadata groups to tree tips.
       group_mapping(setNames(mapped_groups, tips))
 
       showNotification(
@@ -382,10 +350,6 @@ mod02_RTT_server <- function(id, global_state) {
         type = "message"
       )
     })
-
-
-    # Keep the click observer suspended until the Plotly tree has been
-    # rendered and its plotly_click event has been registered with Shiny.
     click_observer <- observeEvent(
       plotly::event_data("plotly_click", source = "tree_source"),
       {
@@ -547,8 +511,6 @@ mod02_RTT_server <- function(id, global_state) {
       req(rtt_data(), group_mapping())
 
       df <- rtt_data()$raw_df
-
-      # Map each taxon to its regression group.
       df$Group <- group_mapping()[df$Taxon]
 
       df
@@ -686,11 +648,6 @@ mod02_RTT_server <- function(id, global_state) {
       }
     })
 
-
-    # ---------------------------------------------------------
-    # FIX 2: Display a centered legend above the regression plot
-    # for both global strict-clock and multiple local/trait groups.
-    # ---------------------------------------------------------
     build_scatter_plot <- function(
       df,
       s,
@@ -754,8 +711,6 @@ mod02_RTT_server <- function(id, global_state) {
             legend.text = element_text(
               size = lg_text
             ),
-
-            # Center the legend above the plotting panel.
             legend.position = "top",
             legend.justification = "center",
             legend.direction = "horizontal",
@@ -781,7 +736,6 @@ mod02_RTT_server <- function(id, global_state) {
 
       if (length(unique(df$Group)) == 1) {
 
-        # Global strict-clock regression.
         p <- p + scale_color_manual(
           values = setNames(
             "#2E6A8C",
@@ -789,7 +743,6 @@ mod02_RTT_server <- function(id, global_state) {
           )
         )
 
-        # Keep the existing red regression line.
         p$layers[[2]]$aes_params$colour <- "#C0392B"
 
         stats_text <- sprintf(
@@ -822,9 +775,6 @@ mod02_RTT_server <- function(id, global_state) {
             label.size = NA
           )
 
-        # IMPORTANT:
-        # Do not hide the legend for the Global group.
-
       } else if (!is.null(annot_labels)) {
 
         valid_labels <- na.omit(annot_labels)
@@ -850,9 +800,6 @@ mod02_RTT_server <- function(id, global_state) {
               alpha = 0.9,
               label.size = NA
             )
-
-          # IMPORTANT:
-          # Keep the legend visible for local clocks and trait groups.
         }
       }
 
@@ -894,8 +841,6 @@ mod02_RTT_server <- function(id, global_state) {
         ) %>%
           layout(
             hovermode = "closest",
-
-            # Keep the Plotly legend centered horizontally at the top.
             legend = list(
               orientation = "h",
               x = 0.5,
@@ -904,8 +849,6 @@ mod02_RTT_server <- function(id, global_state) {
               yanchor = "bottom",
               title = list(text = "Regression Group")
             ),
-
-            # Reserve space above the plot for the legend.
             margin = list(t = 75)
           ) %>%
           config(displayModeBar = TRUE)
@@ -954,12 +897,6 @@ mod02_RTT_server <- function(id, global_state) {
       }
     )
 
-
-    # ---------------------------------------------------------
-    # NEW: Extract tree construction into a reactive so that both
-    # the on-screen Plotly rendering and the PDF export use the
-    # exact same ggtree object.
-    # ---------------------------------------------------------
     build_tree_plot <- reactive({
       req(global_state$phylo_tree)
 
@@ -970,11 +907,7 @@ mod02_RTT_server <- function(id, global_state) {
       }
 
       options(ignore.negative.edge = TRUE)
-
-      # Initialize the base ggtree object.
       p_tree <- ggtree(phy)
-
-      # Manually extract coordinates and construct tree branches.
       df <- p_tree$data
 
       df_segs <- df %>%
@@ -984,10 +917,7 @@ mod02_RTT_server <- function(id, global_state) {
           by = c("parent" = "node")
         )
 
-      # Overlay geom_segment layers to preserve tree branches in Plotly.
       p_tree <- p_tree +
-
-        # Vertical branches.
         geom_segment(
           data = df_segs,
           aes(
@@ -999,8 +929,6 @@ mod02_RTT_server <- function(id, global_state) {
           color = "#5D6D7E",
           linewidth = 0.5
         ) +
-
-        # Horizontal branches.
         geom_segment(
           data = df_segs,
           aes(
@@ -1012,8 +940,6 @@ mod02_RTT_server <- function(id, global_state) {
           color = "#5D6D7E",
           linewidth = 0.5
         ) +
-
-        # Terminal nodes (tips).
         geom_point(
           data = filter(df, isTip == TRUE),
           aes(
@@ -1063,10 +989,6 @@ mod02_RTT_server <- function(id, global_state) {
           plotly::layout(dragmode = "pan") %>%
           plotly::config(displayModeBar = TRUE) %>%
           plotly::event_register("plotly_click")
-
-        # Resume the click observer only after this reactive flush completes.
-        # At that point, Shiny/Plotly has had an opportunity to register the
-        # event ID associated with source = "tree_source".
         session$onFlushed(
           function() {
             click_observer$resume()
@@ -1078,7 +1000,6 @@ mod02_RTT_server <- function(id, global_state) {
 
       }))
     })
-    # Export the phylogenetic tree as a vector PDF.
     output$download_tree_pdf <- downloadHandler(
       filename = function() {
         paste0(
