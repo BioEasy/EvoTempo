@@ -1,0 +1,33 @@
+Package: EvoTempo
+Type: Package
+Title: A Comprehensive Toolkit for Evaluating Temporal Signal in Phylodynamics
+Version: 1.0.0
+Authors@R: person(given = "Fangluan", family = "Gao", role = c("aut", "cre"), email = "rainby@fafu.edu.cn")
+Description: An interactive R/Shiny toolkit for evaluating temporal signal in
+    measurably evolving populations. Designed for viral phylodynamicists and
+    evolutionary biologists, it integrates complementary approaches for
+    diagnosing temporal-genetic confounding, exploring root-to-tip temporal
+    structure, performing date-randomization tests, and evaluating temporal
+    signal using Bayesian model comparison. EvoTempo provides these analyses
+    within a unified graphical interface, reducing the need for complex
+    command-line workflows while supporting reproducible analysis and
+    publication-ready visualization.
+License: GPL (>= 3)
+Encoding: UTF-8
+Imports: 
+    shiny,
+    bslib,
+    shinyjs,
+    DT,
+    zip,
+    stringr,
+    ggplot2,
+    plotly,
+    ape,
+    coda,
+    seqinr,
+    ade4,
+    dplyr
+Suggests:
+    mclust
+RoxygenNote: 7.2.3
