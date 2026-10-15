@@ -77,7 +77,7 @@ mod04_BETS_ui <- function(id) {
 }
 
 # ---------------------------------------------------------
-#Server 
+# Server 
 # ---------------------------------------------------------
 mod04_BETS_server <- function(id, global_state) {
   moduleServer(id, function(input, output, session) {
