@@ -16,13 +16,13 @@ mod05_About_ui <- function(id) {
           class = "border-primary mb-4 shadow-sm",
           card_header(class = "bg-primary text-white font-weight-bold", " About EvoTempo"),
           card_body(
-            p("EvoTempo is a comprehensive, interactive R/Shiny web application designed for temporal signal evaluation prior to phylodynamic analysis."),
-            p("Bridging the gap between exploratory data analysis and strict Bayesian hypothesis testing, EvoTempo provides an all-in-one platform for:"),
+            p("EvoTempo is an interactive R/Shiny toolkit for evaluating temporal signal in evolving populations."),
+            p("Bridging exploratory data analysis and Bayesian model comparison, EvoTempo integrates four analytical modules within a unified interface:"),
             tags$ul(
-              tags$li(tags$strong("Mantel Tests:"), " Assessing data collinearity and confounding factors before analysis."),
-              tags$li(tags$strong("Root-to-Tip Regression:"), " Interactive visualization of global and local molecular clocks."),
-              tags$li(tags$strong("Date Randomization Test:"), " One-click XML permutation and automated log parsing for strict CR1/CR2 evaluation."),
-              tags$li(tags$strong("BETS Calculator:"), " Automated Bayesian Evaluation of Temporal Signal via Marginal Likelihoods.")
+              tags$li(tags$strong("Mantel Tests:"), " Detect temporal–genetic confounding via distance-matrix correlation."),
+              tags$li(tags$strong("Root-to-Tip Regression:"), " Explore temporal structure across global, clade, and trait-partitioned groups."),
+              tags$li(tags$strong("Date Randomization Test:"), " Generate standard or cluster-based XML replicates and evaluate CR1/CR2."),
+              tags$li(tags$strong("BETS Calculator:"), " Compare heterochronous and isochronous models via marginal likelihoods.")
             )
           )
         ),
