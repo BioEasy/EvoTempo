@@ -44,6 +44,7 @@ mod02_RTT_ui <- function(id) {
           )
         )
       ),
+
       conditionalPanel(
         condition = sprintf("input['%s'] == 'metadata'", ns("grouping_mode")),
         card(
@@ -122,7 +123,20 @@ mod02_RTT_server <- function(id, global_state) {
     rtt_data <- reactiveVal(NULL)
     group_mapping <- reactiveVal(NULL)
     local_clock_counter <- reactiveVal(1)
+    selected_clock_nodes <- reactiveVal(setNames(character(0), character(0)))
     raw_trait_data <- reactiveVal(NULL)
+
+    # Helper to generate consistent color palette across tree and scatter plot
+    get_group_palette <- function(groups) {
+      lvls <- sort(unique(as.character(groups)))
+      n <- length(lvls)
+      if (n <= 1) {
+        return(setNames("#2E6A8C", lvls))
+      }
+      hues <- seq(15, 375, length = n + 1)
+      cols <- grDevices::hcl(h = hues, l = 65, c = 100)[1:n]
+      setNames(cols, lvls)
+    }
 
     output$dependency_warning <- renderUI({
       if (is.null(global_state$phylo_tree)) {
@@ -140,6 +154,7 @@ mod02_RTT_server <- function(id, global_state) {
       rtt_data(NULL)
       group_mapping(NULL)
       local_clock_counter(1)
+      selected_clock_nodes(setNames(character(0), character(0)))
       raw_trait_data(NULL)
     })
 
@@ -149,6 +164,7 @@ mod02_RTT_server <- function(id, global_state) {
       tips <- global_state$phylo_tree$tip.label
       group_mapping(setNames(rep("Global", length(tips)), tips))
       local_clock_counter(1)
+      selected_clock_nodes(setNames(character(0), character(0)))
     })
 
     observeEvent(input$grouping_mode, {
@@ -158,14 +174,18 @@ mod02_RTT_server <- function(id, global_state) {
         tips <- global_state$phylo_tree$tip.label
         group_mapping(setNames(rep("Global", length(tips)), tips))
         local_clock_counter(1)
+        selected_clock_nodes(setNames(character(0), character(0)))
       }
     })
+
     observeEvent(input$trait_csv, {
       req(input$trait_csv)
 
       tryCatch({
 
         file_path <- input$trait_csv$datapath
+
+        # Inspect the header to identify the field delimiter.
         first_line <- readLines(file_path, n = 1, warn = FALSE)
 
         if (length(first_line) == 0 || !nzchar(first_line)) {
@@ -183,6 +203,8 @@ mod02_RTT_server <- function(id, global_state) {
             gregexpr("\t", first_line, fixed = TRUE)
           )
         )
+
+        # Default to comma-separated CSV.
         delimiter <- ","
 
         if (delimiter_counts["semicolon"] >
@@ -198,6 +220,7 @@ mod02_RTT_server <- function(id, global_state) {
 
           delimiter <- "\t"
         }
+       
         df <- utils::read.table(
           file_path,
           header = TRUE,
@@ -238,6 +261,7 @@ mod02_RTT_server <- function(id, global_state) {
             }
           }
         }
+
         if (length(names(df)) > 0) {
           names(df)[1] <- sub(
             "^\ufeff",
@@ -245,7 +269,9 @@ mod02_RTT_server <- function(id, global_state) {
             names(df)[1]
           )
         }
+
         names(df) <- trimws(names(df))
+
         if (ncol(df) < 2) {
           stop(
             paste(
@@ -255,6 +281,7 @@ mod02_RTT_server <- function(id, global_state) {
             )
           )
         }
+
         raw_trait_data(df)
 
         showNotification(
@@ -343,6 +370,8 @@ mod02_RTT_server <- function(id, global_state) {
       mapped_groups[
         is.na(mapped_groups) | trimws(mapped_groups) == ""
       ] <- "Unknown"
+
+      # Map metadata groups to tree tips.
       group_mapping(setNames(mapped_groups, tips))
 
       showNotification(
@@ -408,6 +437,11 @@ mod02_RTT_server <- function(id, global_state) {
           current_mapping[clade_tips] <- new_clock_name
           group_mapping(current_mapping)
           local_clock_counter(local_clock_counter() + 1)
+
+          # Record selected internal node for color synchronization
+          cur_nodes <- selected_clock_nodes()
+          cur_nodes[as.character(node_id)] <- new_clock_name
+          selected_clock_nodes(cur_nodes)
 
           showNotification(
             paste(
@@ -509,10 +543,8 @@ mod02_RTT_server <- function(id, global_state) {
 
     combined_plot_data <- reactive({
       req(rtt_data(), group_mapping())
-
       df <- rtt_data()$raw_df
       df$Group <- group_mapping()[df$Taxon]
-
       df
     })
 
@@ -711,6 +743,8 @@ mod02_RTT_server <- function(id, global_state) {
             legend.text = element_text(
               size = lg_text
             ),
+
+            # Center the legend above the plotting panel.
             legend.position = "top",
             legend.justification = "center",
             legend.direction = "horizontal",
@@ -736,6 +770,7 @@ mod02_RTT_server <- function(id, global_state) {
 
       if (length(unique(df$Group)) == 1) {
 
+        # Global strict-clock regression.
         p <- p + scale_color_manual(
           values = setNames(
             "#2E6A8C",
@@ -775,31 +810,35 @@ mod02_RTT_server <- function(id, global_state) {
             label.size = NA
           )
 
-      } else if (!is.null(annot_labels)) {
+      } else {
+        p <- p + scale_color_manual(values = get_group_palette(df$Group))
 
-        valid_labels <- na.omit(annot_labels)
+        if (!is.null(annot_labels)) {
 
-        if (length(valid_labels) > 0) {
+          valid_labels <- na.omit(annot_labels)
 
-          combo_text <- paste(
-            valid_labels,
-            collapse = "\n"
-          )
+          if (length(valid_labels) > 0) {
 
-          p <- p +
-            annotate(
-              "label",
-              x = Inf,
-              y = Inf,
-              label = combo_text,
-              hjust = 1.05,
-              vjust = 1.1,
-              size = text_size,
-              fontface = "bold",
-              fill = "white",
-              alpha = 0.9,
-              label.size = NA
+            combo_text <- paste(
+              valid_labels,
+              collapse = "\n"
             )
+
+            p <- p +
+              annotate(
+                "label",
+                x = Inf,
+                y = Inf,
+                label = combo_text,
+                hjust = 1.05,
+                vjust = 1.1,
+                size = text_size,
+                fontface = "bold",
+                fill = "white",
+                alpha = 0.9,
+                label.size = NA
+              )
+          }
         }
       }
 
@@ -849,6 +888,7 @@ mod02_RTT_server <- function(id, global_state) {
               yanchor = "bottom",
               title = list(text = "Regression Group")
             ),
+
             margin = list(t = 75)
           ) %>%
           config(displayModeBar = TRUE)
@@ -953,18 +993,44 @@ mod02_RTT_server <- function(id, global_state) {
 
       if (input$grouping_mode == "local") {
 
+        df_internal <- filter(df, isTip == FALSE)
+        sel_nodes <- selected_clock_nodes()
+        cur_mapping <- group_mapping()
+
+        if (length(sel_nodes) > 0 && !is.null(cur_mapping)) {
+          pal <- get_group_palette(cur_mapping)
+          assigned_clocks <- sel_nodes[as.character(df_internal$node)]
+          node_colors <- ifelse(
+            is.na(assigned_clocks),
+            "darkorange",
+            pal[assigned_clocks]
+          )
+          node_colors[is.na(node_colors)] <- "darkorange"
+
+          node_sizes <- ifelse(is.na(assigned_clocks), 3, 4)
+          node_texts <- ifelse(
+            is.na(assigned_clocks),
+            paste("Node:", df_internal$node),
+            paste0("Node: ", df_internal$node, " (", assigned_clocks, ")")
+          )
+        } else {
+          node_colors <- rep("darkorange", nrow(df_internal))
+          node_sizes <- rep(3, nrow(df_internal))
+          node_texts <- paste("Node:", df_internal$node)
+        }
+
         p_tree <- p_tree +
           geom_point(
-            data = filter(df, isTip == FALSE),
+            data = df_internal,
             aes(
               x = x,
               y = y,
               customdata = node,
-              text = paste("Node:", node)
+              text = node_texts
             ),
-            color = "darkorange",
-            alpha = 0.8,
-            size = 3
+            color = node_colors,
+            alpha = 0.9,
+            size = node_sizes
           )
       }
 
@@ -989,15 +1055,14 @@ mod02_RTT_server <- function(id, global_state) {
           plotly::layout(dragmode = "pan") %>%
           plotly::config(displayModeBar = TRUE) %>%
           plotly::event_register("plotly_click")
+
         session$onFlushed(
           function() {
             click_observer$resume()
           },
           once = TRUE
         )
-
         p
-
       }))
     })
     output$download_tree_pdf <- downloadHandler(
