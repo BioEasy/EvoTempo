@@ -12,22 +12,31 @@ Description: An interactive R/Shiny toolkit for evaluating temporal signal in
     within a unified graphical interface, reducing the need for complex
     command-line workflows while supporting reproducible analysis and
     publication-ready visualization.
-License: GPL (>= 3)
+License: MIT + file LICENSE
 Encoding: UTF-8
+Depends:
+    R (>= 4.1.0)
 Imports: 
-    shiny,
-    bslib,
-    shinyjs,
-    DT,
-    zip,
-    stringr,
-    ggplot2,
-    plotly,
-    ape,
-    coda,
-    seqinr,
     ade4,
-    dplyr
+    ape,
+    bslib,
+    coda,
+    crosstalk,
+    dplyr,
+    DT,
+    future,
+    ggplot2,
+    ggtree,
+    lubridate,
+    plotly,
+    promises,
+    seqinr,
+    shiny,
+    shinyjs,
+    stringr,
+    tools,
+    utils,
+    zip
 Suggests:
     mclust
 RoxygenNote: 7.2.3
