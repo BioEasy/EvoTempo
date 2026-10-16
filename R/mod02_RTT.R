@@ -29,6 +29,7 @@ mod02_RTT_ui <- function(id) {
                   choices = c("Global Regression (Strict Clock)" = "global",
                               "Interactive Clades (Local Clocks)" = "local",
                               "Discrete Trait Partitioning" = "metadata")),
+
       conditionalPanel(
         condition = sprintf("input['%s'] == 'local'", ns("grouping_mode")),
         card(
@@ -136,6 +137,87 @@ mod02_RTT_server <- function(id, global_state) {
       setNames(cols, lvls)
     }
 
+    compute_rtt_core <- function() {
+      req(global_state$phylo_tree, global_state$extracted_dates)
+
+      id_notif <- showNotification(
+        "Optimizing root and computing distances...",
+        duration = NULL
+      )
+
+      tryCatch({
+
+        rtt_res <- run_rtt_regression(
+          phy = global_state$phylo_tree,
+          dates = global_state$extracted_dates,
+          stat = input$rooting_method,
+          reroot = TRUE
+        )
+
+        p_val <- NA
+
+        if (input$run_permutation) {
+
+          showNotification(
+            "Running 1000 permutations...",
+            type = "message",
+            id = id_notif
+          )
+
+          nreps <- 1000
+          obs_r <- rtt_res$stats$r_value
+          nt <- length(global_state$extracted_dates)
+
+          distances <- dist.nodes(
+            rtt_res$phylo_rooted
+          )[nt + 1, 1:nt]
+
+          dates_vec <- global_state$extracted_dates
+          null_r <- numeric(nreps)
+
+          for (i in 1:nreps) {
+            shuff_dates <- sample(dates_vec)
+            null_lm <- lm(distances ~ shuff_dates)
+
+            null_r[i] <- sqrt(summary(null_lm)$r.squared) *
+              sign(coef(null_lm)[2])
+          }
+
+          p_val <- sum(abs(null_r) >= abs(obs_r)) / nreps
+        }
+
+        rtt_res$stats$p_value <- p_val
+
+        if (is.null(group_mapping())) {
+          tips <- rtt_res$phylo_rooted$tip.label
+
+          group_mapping(
+            setNames(rep("Global", length(tips)), tips)
+          )
+
+          local_clock_counter(1)
+        }
+
+        rtt_data(list(
+          raw_df = rtt_res$df_plot,
+          phylo_rooted = rtt_res$phylo_rooted,
+          stats = rtt_res$stats
+        ))
+
+      }, error = function(e) {
+
+        showNotification(
+          paste("RTT Error:", e$message),
+          type = "error"
+        )
+
+      }, finally = {
+
+        removeNotification(id_notif)
+
+      })
+    }
+
     output$dependency_warning <- renderUI({
       if (is.null(global_state$phylo_tree)) {
         card(
@@ -184,7 +266,6 @@ mod02_RTT_server <- function(id, global_state) {
 
         file_path <- input$trait_csv$datapath
 
-        # Inspect the header to identify the field delimiter.
         first_line <- readLines(file_path, n = 1, warn = FALSE)
 
         if (length(first_line) == 0 || !nzchar(first_line)) {
@@ -271,7 +352,6 @@ mod02_RTT_server <- function(id, global_state) {
 
         names(df) <- trimws(names(df))
 
-
         if (ncol(df) < 2) {
           stop(
             paste(
@@ -282,8 +362,8 @@ mod02_RTT_server <- function(id, global_state) {
           )
         }
 
-
         raw_trait_data(df)
+
         showNotification(
           paste(
             "Metadata loaded successfully:",
@@ -344,12 +424,17 @@ mod02_RTT_server <- function(id, global_state) {
 
       df <- raw_trait_data()
 
-      validate(
-        need(
-          input$trait_taxon_col != input$trait_group_col,
-          "Taxon ID Column and Grouping Trait must be different columns."
+      if (input$trait_taxon_col == input$trait_group_col) {
+        showNotification(
+          "Taxon ID Column and Grouping Trait must be different columns.",
+          type = "error"
         )
-      )
+        return()
+      }
+
+      if (is.null(rtt_data()) && !is.null(global_state$extracted_dates)) {
+        compute_rtt_core()
+      }
 
       phy <- if (!is.null(rtt_data())) {
         rtt_data()$phylo_rooted
@@ -357,12 +442,39 @@ mod02_RTT_server <- function(id, global_state) {
         global_state$phylo_tree
       }
 
-      tips <- phy$tip.label
+      tips <- as.character(phy$tip.label)
 
       metadata_ids <- trimws(as.character(df[[input$trait_taxon_col]]))
-      tree_ids <- trimws(as.character(tips))
+      tree_ids <- trimws(tips)
 
       match_idx <- match(tree_ids, metadata_ids)
+
+      if (all(is.na(match_idx))) {
+        non_empty_meta <- which(nzchar(metadata_ids))
+        match_idx <- sapply(tree_ids, function(tid) {
+          hits <- non_empty_meta[
+            startsWith(tid, paste0(metadata_ids[non_empty_meta], "_")) |
+              startsWith(tid, paste0(metadata_ids[non_empty_meta], "|")) |
+              startsWith(tid, paste0(metadata_ids[non_empty_meta], "/")) |
+              startsWith(tid, metadata_ids[non_empty_meta])
+          ]
+          if (length(hits) > 0) {
+            hits[which.max(nchar(metadata_ids[hits]))]
+          } else {
+            NA_integer_
+          }
+        })
+      }
+
+      n_matched <- sum(!is.na(match_idx))
+      if (n_matched == 0) {
+        showNotification(
+          "No Taxon IDs matched between tree tips and the selected column. Please check 'Taxon ID Column'.",
+          type = "error",
+          duration = 8
+        )
+        return()
+      }
 
       mapped_groups <- as.character(
         df[[input$trait_group_col]][match_idx]
@@ -372,13 +484,18 @@ mod02_RTT_server <- function(id, global_state) {
         is.na(mapped_groups) | trimws(mapped_groups) == ""
       ] <- "Unknown"
 
+      selected_clock_nodes(setNames(character(0), character(0)))
       group_mapping(setNames(mapped_groups, tips))
 
       showNotification(
-        "Trait mapping successful! Click 'Compute RTT' to update plot.",
+        sprintf(
+          "Trait mapping applied (%d/%d taxa matched across %d groups).",
+          n_matched, length(tips), length(unique(mapped_groups))
+        ),
         type = "message"
       )
     })
+
 
     click_observer <- observeEvent(
       plotly::event_data("plotly_click", source = "tree_source"),
@@ -438,7 +555,6 @@ mod02_RTT_server <- function(id, global_state) {
           current_mapping[clade_tips] <- new_clock_name
           group_mapping(current_mapping)
           local_clock_counter(local_clock_counter() + 1)
-
           cur_nodes <- selected_clock_nodes()
           cur_nodes[as.character(node_id)] <- new_clock_name
           selected_clock_nodes(cur_nodes)
@@ -460,84 +576,7 @@ mod02_RTT_server <- function(id, global_state) {
 
 
     observeEvent(input$calc_rtt_btn, {
-      req(global_state$phylo_tree, global_state$extracted_dates)
-
-      id_notif <- showNotification(
-        "Optimizing root and computing distances...",
-        duration = NULL
-      )
-
-      tryCatch({
-
-        rtt_res <- run_rtt_regression(
-          phy = global_state$phylo_tree,
-          dates = global_state$extracted_dates,
-          stat = input$rooting_method,
-          reroot = TRUE
-        )
-
-        p_val <- NA
-
-        if (input$run_permutation) {
-
-          showNotification(
-            "Running 1000 permutations...",
-            type = "message",
-            id = id_notif
-          )
-
-          nreps <- 1000
-          obs_r <- rtt_res$stats$r_value
-          nt <- length(global_state$extracted_dates)
-
-          distances <- dist.nodes(
-            rtt_res$phylo_rooted
-          )[nt + 1, 1:nt]
-
-          dates_vec <- global_state$extracted_dates
-          null_r <- numeric(nreps)
-
-          for (i in 1:nreps) {
-            shuff_dates <- sample(dates_vec)
-            null_lm <- lm(distances ~ shuff_dates)
-
-            null_r[i] <- sqrt(summary(null_lm)$r.squared) *
-              sign(coef(null_lm)[2])
-          }
-
-          p_val <- sum(abs(null_r) >= abs(obs_r)) / nreps
-        }
-
-        rtt_res$stats$p_value <- p_val
-
-        if (is.null(group_mapping())) {
-          tips <- rtt_res$phylo_rooted$tip.label
-
-          group_mapping(
-            setNames(rep("Global", length(tips)), tips)
-          )
-
-          local_clock_counter(1)
-        }
-
-        rtt_data(list(
-          raw_df = rtt_res$df_plot,
-          phylo_rooted = rtt_res$phylo_rooted,
-          stats = rtt_res$stats
-        ))
-
-      }, error = function(e) {
-
-        showNotification(
-          paste("RTT Error:", e$message),
-          type = "error"
-        )
-
-      }, finally = {
-
-        removeNotification(id_notif)
-
-      })
+      compute_rtt_core()
     })
 
 
@@ -545,8 +584,17 @@ mod02_RTT_server <- function(id, global_state) {
       req(rtt_data(), group_mapping())
 
       df <- rtt_data()$raw_df
+      gm <- group_mapping()
+      tax_chr <- as.character(df$Taxon)
+      grp <- unname(gm[tax_chr])
 
-      df$Group <- group_mapping()[df$Taxon]
+      if (any(is.na(grp))) {
+        gm_trim <- setNames(as.character(gm), trimws(names(gm)))
+        grp[is.na(grp)] <- unname(gm_trim[trimws(tax_chr[is.na(grp)])])
+      }
+      grp[is.na(grp) | !nzchar(trimws(grp))] <- "Unknown"
+
+      df$Group <- as.character(grp)
 
       df
     })
@@ -559,42 +607,41 @@ mod02_RTT_server <- function(id, global_state) {
 
       stats_list <- lapply(unique(df$Group), function(grp) {
 
-        sub_df <- df[df$Group == grp, ]
+        sub_df <- df[df$Group == grp & !is.na(df$Date) & !is.na(df$Distance), , drop = FALSE]
 
-        if (nrow(sub_df) > 2) {
+        if (nrow(sub_df) > 2 && length(unique(sub_df$Date)) > 1) {
 
-          fit <- lm(Distance ~ Date, data = sub_df)
+          fit <- tryCatch(lm(Distance ~ Date, data = sub_df), error = function(e) NULL)
+          slope <- if (!is.null(fit)) unname(coef(fit)[2]) else NA_real_
 
-          slope <- coef(fit)[2]
-          tmrca <- -coef(fit)[1] / slope
-          r_sq <- summary(fit)$r.squared
+          if (!is.null(fit) && !is.na(slope) && is.finite(slope) && abs(slope) > 1e-15) {
+            tmrca <- unname(-coef(fit)[1] / slope)
+            r_sq <- summary(fit)$r.squared
 
-          label_str <- sprintf(
-            "%s: Rate = %.2e | tMRCA = %.0f | R² = %.3f",
-            grp, slope, tmrca, r_sq
-          )
+            label_str <- sprintf(
+              "%s: Rate = %.2e | tMRCA = %.0f | R² = %.3f",
+              grp, slope, tmrca, r_sq
+            )
 
-          data.frame(
-            Group = grp,
-            Rate = slope,
-            tMRCA = tmrca,
-            R2 = r_sq,
-            Label = label_str,
-            stringsAsFactors = FALSE
-          )
-
-        } else {
-
-          data.frame(
-            Group = grp,
-            Rate = NA,
-            tMRCA = NA,
-            R2 = NA,
-            Label = NA,
-            stringsAsFactors = FALSE
-          )
-
+            return(data.frame(
+              Group = grp,
+              Rate = slope,
+              tMRCA = tmrca,
+              R2 = r_sq,
+              Label = label_str,
+              stringsAsFactors = FALSE
+            ))
+          }
         }
+
+        data.frame(
+          Group = grp,
+          Rate = NA_real_,
+          tMRCA = NA_real_,
+          R2 = NA_real_,
+          Label = NA_character_,
+          stringsAsFactors = FALSE
+        )
       })
 
       do.call(rbind, stats_list)
@@ -610,6 +657,10 @@ mod02_RTT_server <- function(id, global_state) {
 
         cards <- lapply(1:nrow(stats_df), function(i) {
 
+          rate_val <- as.numeric(stats_df$Rate[i])
+          tmrca_val <- as.numeric(stats_df$tMRCA[i])
+          r2_val <- as.numeric(stats_df$R2[i])
+
           card(
             class = "border-primary flex-fill",
             card_body(
@@ -623,15 +674,15 @@ mod02_RTT_server <- function(id, global_state) {
                 style = "font-size:0.95em;",
                 span(
                   strong("Rate: "),
-                  sprintf("%.4e", as.numeric(stats_df$Rate[i]))
+                  if (is.na(rate_val)) "N/A" else sprintf("%.4e", rate_val)
                 ),
                 span(
                   strong("tMRCA: "),
-                  sprintf("%.2f", as.numeric(stats_df$tMRCA[i]))
+                  if (is.na(tmrca_val)) "N/A" else sprintf("%.2f", tmrca_val)
                 ),
                 span(
                   strong("R-squared: "),
-                  sprintf("%.4f", as.numeric(stats_df$R2[i]))
+                  if (is.na(r2_val)) "N/A" else sprintf("%.4f", r2_val)
                 )
               )
             )
@@ -683,7 +734,6 @@ mod02_RTT_server <- function(id, global_state) {
       }
     })
 
-
     build_scatter_plot <- function(
       df,
       s,
@@ -697,6 +747,11 @@ mod02_RTT_server <- function(id, global_state) {
       lg_title <- ifelse(is_web, 10, 12)
       lg_text <- ifelse(is_web, 9, 11)
       text_size <- ifelse(is_web, 3.5, 4.5)
+      valid_lm_groups <- unique(df$Group)[sapply(unique(df$Group), function(g) {
+        sub_d <- df$Date[df$Group == g & !is.na(df$Date) & !is.na(df$Distance)]
+        length(sub_d) >= 2 && length(unique(sub_d)) >= 2
+      })]
+      df_smooth <- df[df$Group %in% valid_lm_groups, , drop = FALSE]
 
       p <- suppressWarnings({
 
@@ -710,6 +765,7 @@ mod02_RTT_server <- function(id, global_state) {
             size = 2
           ) +
           geom_smooth(
+            data = df_smooth,
             method = "lm",
             formula = y ~ x,
             se = FALSE,
@@ -771,8 +827,6 @@ mod02_RTT_server <- function(id, global_state) {
       })
 
       if (length(unique(df$Group)) == 1) {
-
-
         p <- p + scale_color_manual(
           values = setNames(
             "#2E6A8C",
@@ -780,7 +834,9 @@ mod02_RTT_server <- function(id, global_state) {
           )
         )
 
-        p$layers[[2]]$aes_params$colour <- "#C0392B"
+        if (length(p$layers) >= 2) {
+          p$layers[[2]]$aes_params$colour <- "#C0392B"
+        }
 
         stats_text <- sprintf(
           "Rate: %.4e\ntMRCA: %.2f\nr: %.4f",
@@ -796,27 +852,29 @@ mod02_RTT_server <- function(id, global_state) {
           )
         }
 
-        p <- p +
-          annotate(
-            "label",
-            x = Inf,
-            y = Inf,
-            label = stats_text,
-            hjust = 1.05,
-            vjust = 1.1,
-            size = text_size,
-            fontface = "bold",
-            color = "#2C3E50",
-            fill = "white",
-            alpha = 0.9,
-            label.size = NA
-          )
+        if (!is_web) {
+          p <- p +
+            annotate(
+              "label",
+              x = Inf,
+              y = Inf,
+              label = stats_text,
+              hjust = 1.05,
+              vjust = 1.1,
+              size = text_size,
+              fontface = "bold",
+              color = "#2C3E50",
+              fill = "white",
+              alpha = 0.9,
+              label.size = NA
+            )
+        }
 
 
       } else {
         p <- p + scale_color_manual(values = get_group_palette(df$Group))
 
-        if (!is.null(annot_labels)) {
+        if (!is_web && !is.null(annot_labels)) {
 
           valid_labels <- na.omit(annot_labels)
 
@@ -825,7 +883,7 @@ mod02_RTT_server <- function(id, global_state) {
             combo_text <- paste(
               valid_labels,
               collapse = "\n"
-          )
+            )
 
             p <- p +
               annotate(
@@ -841,6 +899,7 @@ mod02_RTT_server <- function(id, global_state) {
                 alpha = 0.9,
                 label.size = NA
               )
+
           }
         }
       }
@@ -939,7 +998,6 @@ mod02_RTT_server <- function(id, global_state) {
       }
     )
 
-
     build_tree_plot <- reactive({
       req(global_state$phylo_tree)
 
@@ -952,6 +1010,7 @@ mod02_RTT_server <- function(id, global_state) {
       options(ignore.negative.edge = TRUE)
 
       p_tree <- ggtree(phy)
+
       df <- p_tree$data
 
       cur_mapping <- group_mapping()
@@ -960,21 +1019,26 @@ mod02_RTT_server <- function(id, global_state) {
           !is.null(cur_mapping) &&
           any(cur_mapping != "Global")
       )
+      has_trait_groups <- (
+        input$grouping_mode == "metadata" &&
+          !is.null(cur_mapping) &&
+          !(length(unique(cur_mapping)) == 1 && unique(cur_mapping)[1] == "Global")
+      )
 
       node_group <- rep("Global", nrow(df))
       names(node_group) <- as.character(df$node)
 
-      if (has_local_clocks) {
+      if (has_local_clocks || has_trait_groups) {
         pal <- get_group_palette(cur_mapping)
 
         for (i in seq_len(nrow(df))) {
           nd <- df$node[i]
           if (df$isTip[i]) {
-            lbl <- df$label[i]
+            lbl <- as.character(df$label[i])
             if (!is.na(lbl) && lbl %in% names(cur_mapping)) {
               node_group[as.character(nd)] <- cur_mapping[[lbl]]
             }
-          } else {
+          } else if (has_local_clocks) {
             clade_tips <- tryCatch(
               ape::extract.clade(phy, node = nd)$tip.label,
               error = function(e) character(0)
@@ -997,7 +1061,6 @@ mod02_RTT_server <- function(id, global_state) {
           df %>% select(node, px = x, py = y),
           by = c("parent" = "node")
         )
-
       seg_colors <- rep("#5D6D7E", nrow(df_segs))
       if (has_local_clocks) {
         is_local_seg <- df_segs$clade_group != "Global"
@@ -1009,6 +1072,9 @@ mod02_RTT_server <- function(id, global_state) {
       if (has_local_clocks) {
         is_local_tip <- df_tips$clade_group != "Global"
         tip_colors[is_local_tip] <- pal[df_tips$clade_group[is_local_tip]]
+      } else if (has_trait_groups) {
+        tip_colors <- unname(pal[df_tips$clade_group])
+        tip_colors[is.na(tip_colors)] <- "#2C3E50"
       }
 
       p_tree <- p_tree +
@@ -1060,6 +1126,7 @@ mod02_RTT_server <- function(id, global_state) {
             " (", df_internal$clade_group[is_local_int], ")"
           )
 
+          # Slightly enlarge the clicked clade root node(s)
           sel_nodes <- names(selected_clock_nodes())
           is_clicked_root <- as.character(df_internal$node) %in% sel_nodes & is_local_int
           int_sizes[is_clicked_root] <- 4.2
@@ -1101,7 +1168,6 @@ mod02_RTT_server <- function(id, global_state) {
           plotly::layout(dragmode = "pan") %>%
           plotly::config(displayModeBar = TRUE) %>%
           plotly::event_register("plotly_click")
-
         session$onFlushed(
           function() {
             click_observer$resume()
@@ -1113,6 +1179,7 @@ mod02_RTT_server <- function(id, global_state) {
 
       }))
     })
+
     output$download_tree_pdf <- downloadHandler(
       filename = function() {
         paste0(
