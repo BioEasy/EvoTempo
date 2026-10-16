@@ -130,6 +130,70 @@ mod01_Mantel_server <- function(id, global_state) {
     csv_data <- reactiveVal(NULL)
     parsed_df_rv <- reactiveVal(NULL)
     mantel_res <- reactiveVal(NULL)
+
+    parse_uploaded_file <- function(filepath, fmt) {
+      lines <- readLines(filepath, warn = FALSE)
+      lines_trim <- trimws(lines)
+      lines_non_empty <- lines_trim[nzchar(lines_trim)]
+      if (length(lines_non_empty) == 0) {
+        stop("The uploaded file is empty.")
+      }
+      
+      first_line <- lines_non_empty[1]
+      
+      detected_fmt <- fmt
+      if (grepl("^#NEXUS", first_line, ignore.case = TRUE)) {
+        detected_fmt <- "nexus"
+      } else if (startsWith(first_line, ">")) {
+        detected_fmt <- "fasta"
+      } else if (startsWith(first_line, "(") || any(grepl("\\(.*:.*;", lines_non_empty))) {
+        detected_fmt <- "newick"
+      }
+      
+      if (!identical(detected_fmt, fmt)) {
+        updateSelectInput(session, "file_format", selected = detected_fmt)
+      }
+      
+      if (detected_fmt %in% c("newick", "nexus")) {
+        phy <- NULL
+        if (detected_fmt == "nexus") {
+          phy <- tryCatch(
+            ape::read.nexus(filepath),
+            error = function(e) {
+              nwk_text <- paste(lines_non_empty, collapse = "")
+              ape::read.tree(text = nwk_text)
+            }
+          )
+        } else {
+          nwk_text <- paste(lines_non_empty, collapse = "")
+          phy <- ape::read.tree(text = nwk_text)
+        }
+        
+        if (inherits(phy, "multiPhylo")) {
+          phy <- phy[[1]]
+        }
+        if (is.null(phy) || !inherits(phy, "phylo")) {
+          stop("Failed to parse valid phylogenetic tree from file (check Newick/NEXUS syntax).")
+        }
+        
+        phy$tip.label <- gsub("^['\"]|['\"]$", "", trimws(phy$tip.label))
+        
+        if (is.null(phy$edge.length)) {
+          stop("The uploaded tree does not contain branch lengths.")
+        }
+        
+        g_mat <- ape::cophenetic.phylo(phy)
+        g_mat <- g_mat[phy$tip.label, phy$tip.label, drop = FALSE]
+        
+        return(list(
+          names = phy$tip.label,
+          phy = phy,
+          g = g_mat
+        ))
+      } else {
+        return(read_sequence_data(filepath, detected_fmt, "_"))
+      }
+    }
     
     observeEvent(input$reset_mantel_btn, {
       shinyjs::reset("file_upload") 
@@ -141,20 +205,20 @@ mod01_Mantel_server <- function(id, global_state) {
       showNotification("Mantel Test session reset.", type = "message")
     })
     
-    observeEvent(input$file_upload, {
+    observeEvent(list(input$file_upload, input$file_format), {
       req(input$file_upload)
       tryCatch({
-        data <- read_sequence_data(input$file_upload$datapath, input$file_format, "_")
+        data <- parse_uploaded_file(input$file_upload$datapath, input$file_format)
         raw_seq_data(data)
       }, error = function(e) {
-        showNotification(paste("Error:", e$message), type = "error")
+        showNotification(paste("Error:", e$message), type = "error", duration = 8)
       })
-    })
+    }, ignoreInit = TRUE)
     
     observeEvent(input$csv_upload, {
       req(input$csv_upload)
       tryCatch({
-        df <- read.csv(input$csv_upload$datapath, stringsAsFactors = FALSE)
+        df <- read.csv(input$csv_upload$datapath, stringsAsFactors = FALSE, check.names = FALSE)
         csv_data(df)
       }, error = function(e) {
         showNotification("Failed to read CSV. Please ensure it is a valid comma-separated file.", type = "error")
@@ -183,14 +247,24 @@ mod01_Mantel_server <- function(id, global_state) {
       } else if (input$date_source == "csv") {
         if (!is.null(csv_data()) && !is.null(input$csv_taxon_col) && !is.null(input$csv_date_col)) {
           df <- csv_data()
-          match_idx <- match(labels, df[[input$csv_taxon_col]])
+          csv_ids <- gsub("^['\"]|['\"]$", "", trimws(as.character(df[[input$csv_taxon_col]])))
+          match_idx <- match(labels, csv_ids)
+          
+          if (all(is.na(match_idx))) {
+            match_idx <- sapply(labels, function(lbl) {
+              tokens <- trimws(unlist(strsplit(lbl, "[|]")))
+              hit <- which(csv_ids %in% c(lbl, tokens))
+              if (length(hit) > 0) hit[1] else NA_integer_
+            })
+          }
           extracted_strs <- as.character(df[[input$csv_date_col]][match_idx])
         }
       }
       
       decimals <- convert_to_decimal_years(
         extracted_strs, input$parse_type, 
-        input$add_val, input$threshold, input$add_cond, input$date_fmt
+        input$add_val, input$threshold, input$add_cond, input$date_fmt,
+        enable_2digit = input$enable_2digit
       )
       
       df <- data.frame(
