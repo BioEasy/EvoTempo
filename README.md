@@ -119,6 +119,7 @@ EvoTempo/
 ├── www/                        # Static web resources
 │   └── logo.png                # EvoTempo logo
 ├── DESCRIPTION                 # Project metadata and R package dependencies
+├── LICENSE                     # MIT license metadata
 └── README.md                   # Project overview and usage guide
 ```
 ## Installation
