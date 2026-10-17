@@ -134,16 +134,10 @@ EvoTempo is an R/Shiny application that can be run locally using R or RStudio.
 
 ```r
 install.packages(c(
-  "shiny",
-  "bslib",
-  "stringr",
-  "ggplot2",
-  "plotly",
-  "ape",
-  "coda",
-  "seqinr",
-  "ade4",
-  "dplyr"
+  "ade4", "ape", "bslib", "coda", "crosstalk",
+  "dplyr", "DT", "future", "ggplot2", "lubridate",
+  "mclust", "plotly", "promises", "seqinr",
+  "shiny", "shinyjs", "stringr", "zip"
 ))
 ```
 
