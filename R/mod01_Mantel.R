@@ -110,7 +110,11 @@ mod01_Mantel_ui <- function(id) {
           card_header(
             class = "d-flex justify-content-between align-items-center bg-light",
             "Mantel Regression",
-            downloadButton(ns("download_mantel_data"), "Export Plot Data", class = "btn btn-sm btn-outline-secondary")
+            div(
+              class = "d-flex gap-2",
+              downloadButton(ns("download_mantel_data"), "Export Plot Data", class = "btn btn-sm btn-outline-secondary"),
+              downloadButton(ns("download_mantel_pdf"), "Export Vector PDF", class = "btn btn-sm btn-outline-secondary")
+            )
           ),
           card_body(plotlyOutput(ns("scatter_plot"), height = "400px"), class = "p-0")
         ),
@@ -398,6 +402,22 @@ mod01_Mantel_server <- function(id, global_state) {
       content = function(file) {
         req(mantel_res())
         write.csv(mantel_res()$mantel$plot_data, file, row.names = FALSE)
+      }
+    )
+    
+    output$download_mantel_pdf <- downloadHandler(
+      filename = function() {
+        paste0("EvoTempo_Mantel_Regression_", format(Sys.Date(), "%Y%m%d"), ".pdf")
+      },
+      content = function(file) {
+        req(mantel_res())
+        p <- ggplot(mantel_res()$mantel$plot_data, aes(x = Genetic_Distance, y = Temporal_Distance)) +
+          geom_point(alpha = 0.3) + 
+          geom_smooth(method = "lm", se = FALSE, color = "red") + 
+          theme_minimal() +
+          labs(x = "Genetic Distance", y = "Temporal Distance")
+        
+        ggsave(filename = file, plot = p, device = "pdf", width = 6, height = 5)
       }
     )
     
