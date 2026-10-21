@@ -244,40 +244,51 @@ mod01_Mantel_server <- function(id, global_state) {
       labels <- raw_seq_data()$names
       extracted_strs <- rep(NA_character_, length(labels))
       
-      if (input$date_source == "id") {
-        extracted_strs <- extract_date_strings(
-          labels, input$extract_method, input$delim, input$order_pos, input$regex_pat
-        )
-      } else if (input$date_source == "csv") {
-        if (!is.null(csv_data()) && !is.null(input$csv_taxon_col) && !is.null(input$csv_date_col)) {
-          df <- csv_data()
-          csv_ids <- gsub("^['\"]|['\"]$", "", trimws(as.character(df[[input$csv_taxon_col]])))
-          match_idx <- match(labels, csv_ids)
-          
-          if (all(is.na(match_idx))) {
-            match_idx <- sapply(labels, function(lbl) {
-              tokens <- trimws(unlist(strsplit(lbl, "[|]")))
-              hit <- which(csv_ids %in% c(lbl, tokens))
-              if (length(hit) > 0) hit[1] else NA_integer_
-            })
+      tryCatch({
+        if (input$date_source == "id") {
+          extracted_strs <- extract_date_strings(
+            labels, input$extract_method, input$delim, input$order_pos, input$regex_pat
+          )
+        } else if (input$date_source == "csv") {
+          if (!is.null(csv_data()) && !is.null(input$csv_taxon_col) && !is.null(input$csv_date_col)) {
+            df <- csv_data()
+            csv_ids <- gsub("^['\"]|['\"]$", "", trimws(as.character(df[[input$csv_taxon_col]])))
+            match_idx <- match(labels, csv_ids)
+            
+            if (all(is.na(match_idx))) {
+              match_idx <- sapply(labels, function(lbl) {
+                tokens <- trimws(unlist(strsplit(lbl, "[|]")))
+                hit <- which(csv_ids %in% c(lbl, tokens))
+                if (length(hit) > 0) hit[1] else NA_integer_
+              })
+            }
+            
+            if (all(is.na(match_idx))) {
+              showNotification("Warning: No matching Taxon IDs found between CSV and sequence/tree file. Please check column mappings.", type = "warning", duration = 6)
+              extracted_strs <- rep(NA_character_, length(labels))
+            } else {
+              extracted_strs <- as.character(df[[input$csv_date_col]][match_idx])
+            }
           }
-          extracted_strs <- as.character(df[[input$csv_date_col]][match_idx])
         }
-      }
-      
-      decimals <- convert_to_decimal_years(
-        extracted_strs, input$parse_type, 
-        input$add_val, input$threshold, input$add_cond, input$date_fmt,
-        enable_2digit = input$enable_2digit
-      )
-      
-      df <- data.frame(
-        Taxon_ID = labels,
-        Extracted_String = extracted_strs,
-        Decimal_Year = round(decimals, 4),
-        stringsAsFactors = FALSE
-      )
-      parsed_df_rv(df)
+        
+        decimals <- convert_to_decimal_years(
+          extracted_strs, input$parse_type, 
+          input$add_val, input$threshold, input$add_cond, input$date_fmt,
+          enable_2digit = input$enable_2digit
+        )
+        
+        df <- data.frame(
+          Taxon_ID = labels,
+          Extracted_String = extracted_strs,
+          Decimal_Year = round(decimals, 4),
+          stringsAsFactors = FALSE
+        )
+        parsed_df_rv(df)
+        
+      }, error = function(e) {
+        showNotification(paste("Parsing Alignment Warning:", e$message), type = "warning", duration = 5)
+      })
     })
     
     output$preview_table <- renderDT({
