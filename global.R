@@ -5,6 +5,7 @@ library(shiny)
 library(bslib)
 library(promises)
 library(future)
+library(future.apply)
 library(shinyjs)
 
 library(ape)        
