@@ -242,7 +242,7 @@ mod03_DRT_server <- function(id, global_state) {
               clusters_aligned <- meta_df[[c_col]][match_idx]
               
             } else {  # cluster_source == "mclust"
-              if (!requireNamespace("mclust", quietly = TRUE)) {
+              if (!require("mclust", quietly = TRUE)) {
                 stop("Package 'mclust' is required for auto-clustering. Please install it: install.packages('mclust').")
               }
               
