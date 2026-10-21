@@ -1,6 +1,5 @@
 ## R/utils_temporal.R
 ## Core algorithms adapted from Murray et al. (https://doi.org/10.1111/2041-210X.12466)
-## EvoTempo: Underlying statistical and phylogenetic algorithms
 
 library(ape)
 library(ade4)
@@ -205,7 +204,9 @@ get.altered.tree <- function(phy, p, root.node) {
 
 myfun <- function(p, phy, dates, stat = 'nve-rms', nt) {
   phy <- get.altered.tree(phy, p, nt + 1)
-  div <- dist.nodes(phy)[nt + 1, 1:nt]
+  
+  div <- ape::node.depth.edgelength(phy)[1:nt]
+  
   mylm <- lm(div ~ dates)
   
   if (stat == 'r') {
@@ -240,8 +241,8 @@ run_rtt_regression <- function(phy, dates, stat = 'nve-rms', reroot = TRUE) {
   }
   
   nt <- length(phy$tip.label)
-  root_node <- nt + 1
-  distances <- dist.nodes(phy)[root_node, 1:nt]
+  
+  distances <- ape::node.depth.edgelength(phy)[1:nt]
   
   mylm <- lm(distances ~ dates)
   slm <- summary(mylm)
