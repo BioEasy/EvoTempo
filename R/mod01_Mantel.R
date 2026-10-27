@@ -382,7 +382,7 @@ mod01_Mantel_server <- function(id, global_state) {
         card(class = "bg-danger text-white mt-4", card_body(
           div(class = "d-flex justify-content-between align-items-center",
               div(
-                h5(icon("triangle-exclamation"), " Significant Confounding Detected"),
+                h5(icon("triangle-exclamation"), " Significant Temporal–Genetic Association"),
                 p(sprintf("Mantel r = %.3f, P-value = %.4f", data$r_value, data$p_value), class="mb-0")
               ),
               downloadButton(session$ns("download_cluster_csv"), "Download Cluster Metadata (.csv)", class="btn-light btn-sm text-danger font-weight-bold")
@@ -390,7 +390,7 @@ mod01_Mantel_server <- function(id, global_state) {
         ))
       } else {
         card(class = "bg-primary text-white mt-4", card_body(
-          h5(icon("check-circle"), " No Confounding Detected"),
+          h5(icon("check-circle"), " No Significant Temporal–Genetic Association"),
           p(sprintf("Mantel r = %.3f, P-value = %.4f", data$r_value, data$p_value), class="mb-0")
         ))
       }
