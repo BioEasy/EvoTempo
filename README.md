@@ -1,10 +1,21 @@
-# EvoTempo: Evaluating Temporal Signal in Phylodynamics
+# EvoTempo
 
-**EvoTempo** is an interactive R/Shiny toolkit for evaluating temporal signal in measurably evolving populations. Designed for viral phylodynamicists and evolutionary biologists, it integrates complementary approaches for diagnosing temporal–genetic confounding, exploring root-to-tip temporal structure, performing date-randomization tests, and evaluating temporal signal using Bayesian model comparison.
+**EvoTempo** is an interactive R Shiny toolkit for evaluating temporal signal in measurably evolving populations. It connects exploratory diagnostics with preparation and interpretation of external BEAST analyses.
 
 EvoTempo provides these analyses within a unified graphical interface, reducing the need for complex command-line workflows while supporting reproducible analysis and publication-ready visualization.
 
+## Modules and data connections
 ---
+| Module | Function | Input and execution |
+| --- | --- | --- |
+| 1 Data Processing and Mantel Test | Parse dates and examine temporal–genetic association | One tree OR nucleotide FASTA alignment, with dates from identifiers or CSV |
+| 2 Interactive Root-to-Tip Regression | Explore global, clade and discrete-trait regressions | Tree and dates shared from Module 1 |
+| 3 Date-Randomization Test (DRT) | Generate randomized XMLs and compare rate posteriors | Supported BEAST XML or original/randomized MCMC logs; independent entry point |
+| 4 Bayesian Evaluation of Temporal Signal (BETS) | Compare supplied log marginal likelihoods | External estimates for heterochronous and isochronous models; independent entry point | 
+
+Module 1 supplies Module 2 after **Run Mantel Test** or **Send to RTT (Skip Mantel Test)**. Module 2 has no independent tree/date upload. Cluster assignments from Module 1 must be exported and uploaded explicitly into Module 3. The Mantel result does not change the **Enable Cluster-based DRT** setting.
+
+BEAST execution, MCMC convergence assessment and marginal-likelihood estimation take place outside EvoTempo.
 
 ## Key Features & Modules
 
@@ -122,42 +133,25 @@ EvoTempo/
 ├── LICENSE                     # MIT license metadata
 └── README.md                   # Project overview and usage guide
 ```
-## Installation
+## Installation and launch
 
-EvoTempo is an R/Shiny application that can be run locally using R or RStudio.
-
-### Requirements
-
-* **R ≥ 4.1.0**
-* RStudio is recommended but not required.
-* The following R packages are required:
+The declared minimum is R 4.1.0. Install the listed packages in a compatible R environment. `ggtree` comes from Bioconductor; `mclust` is needed only for automatic date clustering.
 
 ```r
 install.packages(c(
-  "ade4", "ape", "bslib", "coda", "crosstalk",
-  "dplyr", "DT", "future", "ggplot2", "lubridate",
-  "mclust", "plotly", "promises", "seqinr",
+  "ade4", "ape", "bslib", "coda", "crosstalk", "dplyr", "DT",
+  "future", "ggplot2", "lubridate", "plotly", "promises", "seqinr",
   "shiny", "shinyjs", "stringr", "zip"
 ))
-```
-
-### Launching EvoTempo
-
-Clone or download this repository and navigate to the EvoTempo directory:
-
-```r
-setwd("path/to/EvoTempo")
-```
-
-Then launch the application:
-
-```r
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install("ggtree")
+# Optional, for date-based automatic clustering:
+install.packages("mclust")
+setwd("path/to/EvoTempo") # directory containing app.R and global.R
 shiny::runApp()
 ```
 
-Alternatively, open `app.R` in RStudio and run the application directly.
-
----
+Specific minimum browser/OS versions have not been established for this snapshot. This directory contains a Shiny application; the `DESCRIPTION` file lists metadata and dependencies.
 
 ## Input & Output
 
@@ -192,29 +186,18 @@ BEAST analyses are performed externally. EvoTempo generates the required XML con
 
 ---
 
-## Citations & Methodology
+## Citations
 
 EvoTempo integrates established methodologies from molecular epidemiology, phylogenetics, and phylodynamics. If you use EvoTempo in your research, please cite the software together with the original publications relevant to the analyses performed.
+Citation
 
-### Root-to-Tip Regression / TempEst Framework
+If you use EvoTempo in your research, please cite:
 
-Rambaut, A., et al. (2016). Exploring the temporal structure of heterochronous sequences using TempEst. *Virus Evolution*, **2**(1), vew007.
+**EvoTempo: An interactive R Shiny toolkit for temporal signal evaluation in measurably evolving populations.**
 
-### Date-Randomization Test Criteria (CR1/CR2)
+**Citation details**: Li et al. EvoTempo: An interactive R Shiny toolkit for temporal signal evaluation in measurably evolving populations. 2026; Manuscript in preparation.
 
-Duchêne, S., et al. (2015). The performance of the date-randomization test in phylogenetic trait analyses. *Molecular Biology and Evolution*, **32**(4), 1065–1074.
-
-### Confounding Theory & Mantel Test
-
-Murray, G. G. R., et al. (2016). The effect of genetic structure on molecular dating and tests for temporal signal. *Methods in Ecology and Evolution*, **7**, 80–89.
-
-### Cluster-Based DRT
-
-Rieux, A., & Khatchikian, C. E. (2017). TipDatingBeast: an R package to assist the implementation of phylogenetic tip-dating tests using BEAST. *Molecular Ecology Resources*, **17**(4), 608–613.
-
-### Bayesian Evaluation of Temporal Signal
-
-Duchêne, S., et al. (2020). Bayesian evaluation of temporal signal in measurably evolving populations. *Molecular Biology and Evolution*, **37**(11), 3363–3379.
+Please also cite the relevant original methods and software used in your analysis.
 
 ---
 
