@@ -129,6 +129,8 @@ EvoTempo/
 │   └── extdata/                # Example datasets for testing
 ├── www/                        # Static web resources
 │   └── logo.png                # EvoTempo logo
+│   ├── Manual.pdf              # User manual
+│   └── Guide.pdf               # Quick guide
 ├── DESCRIPTION                 # Project metadata and R package dependencies
 ├── LICENSE                     # MIT license metadata
 └── README.md                   # Project overview and usage guide
