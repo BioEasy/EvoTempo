@@ -2,11 +2,11 @@ Package: EvoTempo
 Type: Package
 Title: An Interactive Toolkit for Evaluating Temporal Signal in Measurably Evolving Populations
 Version: 1.0.0
-Authors@R: person(given = "Fangluan", family = "Gao", role = c("aut", "cre"), email = "rainby@fafu.edu.cn")
+Authors@R: person(given = "Fangluan", family = "Gao", role = c("aut", "cre"), email = "raindy@fafu.edu.cn")
 Description: An interactive R/Shiny toolkit for evaluating temporal signal in
     measurably evolving populations. Designed for viral phylodynamicists and
     evolutionary biologists, it integrates complementary approaches for
-    diagnosing temporal-genetic confounding, exploring root-to-tip temporal
+    examining temporal–genetic association, exploring root-to-tip temporal
     structure, performing date-randomization tests, and evaluating temporal
     signal using Bayesian model comparison. EvoTempo provides these analyses
     within a unified graphical interface, reducing the need for complex
