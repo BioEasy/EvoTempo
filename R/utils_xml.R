@@ -27,6 +27,10 @@ get_shuffled_dates <- function(original_dates, use_clusters = FALSE, clusters = 
   if (!use_clusters || is.null(clusters)) {
     return(sample(original_dates))
   } else {
+    if (length(clusters) != length(original_dates) || anyNA(clusters) ||
+        length(unique(clusters)) < 2) {
+      stop("Cluster-based DRT requires a non-missing cluster for every date and at least two clusters.")
+    }
     new_dates <- numeric(length(original_dates))   
     for (i in seq_along(original_dates)) {
       c_id <- clusters[i]
@@ -34,7 +38,7 @@ get_shuffled_dates <- function(original_dates, use_clusters = FALSE, clusters = 
       if (length(valid_pool) == 0) {
         new_dates[i] <- original_dates[i]
       } else {
-        new_dates[i] <- sample(valid_pool, size = 1)
+        new_dates[i] <- valid_pool[sample.int(length(valid_pool), size = 1)]
       }
     }
     return(new_dates)
