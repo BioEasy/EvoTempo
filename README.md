@@ -180,22 +180,15 @@ EvoTempo can generate or export:
 
 ## External Software
 
-EvoTempo is designed to work with **BEAST 1.x and BEAST 2.x** for Bayesian phylogenetic analyses required by the DRT and BETS workflows.
-
-BEAST analyses are performed externally. EvoTempo generates the required XML configurations and subsequently processes the resulting MCMC logs for downstream temporal-signal evaluation.
+EvoTempo supports **BEAST 1.x and BEAST 2.x** for DRT and BETS workflows. It generates BEAST XML configurations and processes MCMC logs, while Bayesian analyses are performed externally.
 
 ---
 
-## Citations
-
-EvoTempo integrates established methodologies from molecular epidemiology, phylogenetics, and phylodynamics. If you use EvoTempo in your research, please cite the software together with the original publications relevant to the analyses performed.
-Citation
+## Citation
 
 If you use EvoTempo in your research, please cite:
 
-**EvoTempo: An interactive R Shiny toolkit for temporal signal evaluation in measurably evolving populations.**
-
-**Citation details**: Li et al. EvoTempo: An interactive R Shiny toolkit for temporal signal evaluation in measurably evolving populations. 2026; Manuscript in preparation.
+**Li et al. EvoTempo: An interactive R Shiny toolkit for temporal signal evaluation in measurably evolving populations. 2026; Manuscript in preparation.**
 
 Please also cite the relevant original methods and software used in your analysis.
 
