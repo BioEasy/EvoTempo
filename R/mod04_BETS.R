@@ -1,4 +1,4 @@
-## R/mod05_BETS.R
+## R/mod04_BETS.R
 ## EvoTempo: Module 05 - BETS Calculator (Bayesian Evaluation of Temporal Signal)
 
 library(shiny)
@@ -121,7 +121,6 @@ mod04_BETS_server <- function(id, global_state) {
         return()
       }
       
-      # ln(Bayes Factor) = ln(MLE_heterochronous) - ln(MLE_isochronous)
       log_bf <- input[["het_mle"]] - input[["iso_mle"]]
       bets_res(list(
         het = input[["het_mle"]],
@@ -197,32 +196,37 @@ mod04_BETS_server <- function(id, global_state) {
     output$bets_result_ui <- renderUI({
       req(bets_res())
       bf <- bets_res()$bf
-      
+         
       if (bf > 5) {
         status_color <- "bg-primary text-white"
         status_icon <- "check-double"
-        conclusion <- "Very Strong Evidence FOR Temporal Signal"
-        advice <- "The dataset contains a highly significant temporal signal. It is safe to proceed with tip-dating calibration in BEAST."
+        conclusion <- "Very Strong Support for Mhet"
+        advice <- "Mhet has greater marginal-likelihood support. Interpret this comparison alongside model adequacy, sampling design, and marginal-likelihood estimation uncertainty."
       } else if (bf > 3) {
         status_color <- "bg-primary text-white"
         status_icon <- "check"
-        conclusion <- "Strong Evidence FOR Temporal Signal"
-        advice <- "The dataset contains a significant temporal signal. You can proceed with tip-dating calibration."
+        conclusion <- "Strong Support for Mhet"
+        advice <- "Mhet has greater marginal-likelihood support under the compared models. Check model adequacy and estimation reliability before drawing dating conclusions."
       } else if (bf > 1) {
         status_color <- "bg-warning text-dark"
         status_icon <- "circle-exclamation"
-        conclusion <- "Positive (Moderate) Evidence FOR Temporal Signal"
-        advice <- "Temporal signal is present but not overwhelmingly strong. Consider testing stricter clock models or verifying data quality."
+        conclusion <- "Positive Support for Mhet"
+        advice <- "The comparison favors Mhet, with positive support on the displayed scale. Assess sensitivity to model configuration and estimation uncertainty."
       } else if (bf > 0) {
         status_color <- "bg-secondary text-white"
         status_icon <- "minus"
         conclusion <- "Weak / Inconclusive Evidence"
-        advice <- "The temporal signal is barely supported. Tip-dating may lead to wide confidence intervals and unreliable clock rates."
+        advice <- "The comparison provides only weak relative support for Mhet."
+      } else if (bf == 0) {
+        status_color <- "bg-secondary text-white"
+        status_icon <- "equals"
+        conclusion <- "Equal Marginal-Likelihood Support"
+        advice <- "Both models have the same supplied log marginal likelihood. The comparison favors neither model."
       } else {
         status_color <- "bg-danger text-white"
         status_icon <- "xmark"
-        conclusion <- "Evidence AGAINST Temporal Signal"
-        advice <- "The isochronous model fits the data better. Tip-dating should NOT be used. Consider using informative clock rate priors or external node calibrations instead."
+        conclusion <- "Greater Support for Miso"
+        advice <- "Miso has greater marginal-likelihood support. The strength of that preference depends on the magnitude of ln BF. This comparison alone does not prescribe a calibration strategy."
       }
       
       card(
