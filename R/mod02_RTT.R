@@ -37,7 +37,7 @@ mod02_RTT_ui <- function(id) {
           card_body(
             class = "p-2",
             h6(" Interactive Clocks"),
-            p("Click on internal nodes in the tree to assign independent local clocks.",
+            p("Click on internal nodes in the tree to assign separate RTT regression lines to selected clades.",
               style = "font-size:0.9em; margin-bottom: 5px;"),
             actionButton(ns("clear_clocks_btn"), "Clear Local Clocks",
                          class = "btn-light btn-sm w-100")
