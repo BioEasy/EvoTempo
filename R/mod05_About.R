@@ -19,7 +19,7 @@ mod05_About_ui <- function(id) {
             p("EvoTempo is an interactive R/Shiny toolkit for evaluating temporal signal in evolving populations."),
             p("Bridging exploratory data analysis and Bayesian model comparison, EvoTempo integrates four analytical modules within a unified interface:"),
             tags$ul(
-              tags$li(tags$strong("Mantel Tests:"), " Detect temporal–genetic confounding via distance-matrix correlation."),
+              tags$li(tags$strong("Mantel Tests:"), " Examine temporal–genetic association using distance matrices."),
               tags$li(tags$strong("Root-to-Tip Regression:"), " Explore temporal structure across global, clade, and trait-partitioned groups."),
               tags$li(tags$strong("Date Randomization Test:"), " Generate standard or cluster-based XML replicates and evaluate CR1/CR2."),
               tags$li(tags$strong("BETS Calculator:"), " Compare heterochronous and isochronous models via marginal likelihoods.")
@@ -46,7 +46,7 @@ mod05_About_ui <- function(id) {
           p("If you use EvoTempo in your research, please consider citing the software along with the underlying algorithms:"),
             tags$ul(
               tags$li(tags$strong("TempEst / RTT Regression: "), "Rambaut, A., et al. (2016). Exploring the temporal structure of heterochronous sequences using TempEst. ", tags$em("Virus Evolution"), ", 2(1), vew007."),
-              tags$li(tags$strong("DRT Criteria (CR1/CR2): "), "Duchêne, S., et al. (2015). The performance of the date-randomization test in phylogenetic trait analyses. ", tags$em("Molecular Biology and Evolution"), ", 32(4), 1065-1074."),
+              tags$li(tags$strong("DRT Criteria (CR1/CR2): "), "Duchêne, S., et al. (2015). `The performance of the date-randomization test in phylogenetic analyses of time-structured virus data. ", tags$em("Molecular Biology and Evolution"), ", 32(7), 1895–1906."),
               tags$li(tags$strong("Confounding Theory & Mantel Test: "),  "Murray, G. G. R., et al. (2016). The effect of genetic structure on molecular dating and tests for temporal signal. ", tags$em("Methods in Ecology and Evolution"), ", 7, 80–89."),
               tags$li(tags$strong("Cluster-based DRT Algorithm: "), "Rieux, A., & Khatchikian, C. E. (2017). TipDatingBeast: an R package to assist the implementation of phylogenetic tip-dating tests using BEAST. ", tags$em("Molecular Ecology Resources"), ", 17(4), 608-613."),
               tags$li(tags$strong("BETS Framework: "), "Duchêne, S., et al. (2020). Bayesian evaluation of temporal signal in measurably evolving populations. ", tags$em("Molecular Biology and Evolution"), ", 37(11), 3363-3379."),
