@@ -33,8 +33,9 @@ mod05_About_ui <- function(id) {
           card_body(
             p("EvoTempo is an open-source project. For detailed tutorials, user manuals, and source code, please visit our repositories:"),
             div(class = "d-flex gap-2",
-                tags$a(href = "https://github.com/BioEasy/EvoTempo", target = "_blank", class = "btn btn-outline-primary", icon("github"), " View on GitHub"),
-                tags$a(href = "Manual.pdf", target = "_blank", class = "btn btn-outline-primary", icon("book-open"), " Read Manual")
+                tags$a(href = "Guide.pdf", target = "_blank", class = "btn btn-outline-primary", icon("file-lines"), " Quick Guide"),
+                tags$a(href = "Manual.pdf", target = "_blank", class = "btn btn-outline-primary", icon("book-open"), " Read Manual"),
+                tags$a(href = "https://github.com/BioEasy/EvoTempo", target = "_blank", class = "btn btn-outline-primary", icon("github"), " View on GitHub")
             )
           )
         ),
