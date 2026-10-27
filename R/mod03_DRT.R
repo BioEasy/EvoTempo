@@ -366,10 +366,11 @@ mod03_DRT_server <- function(id, global_state) {
     log_eval_results <- reactiveVal(NULL)
     
     observeEvent(input[["analyze_logs_btn"]], {
-      req(input[["orig_log"]], input[["rand_logs"]])
+    req(input[["orig_log"]], input[["rand_logs"]])
+    log_eval_results(NULL)
       id_notif <- showNotification("Parsing MCMC logs and computing 95% HPDs...", duration = NULL, type = "message")
       
-      tryCatch({
+    tryCatch({
         burnin_frac <- input[["burnin"]] / 100
         param <- input[["param_target"]]
         
@@ -387,13 +388,15 @@ mod03_DRT_server <- function(id, global_state) {
         rand_stats <- lapply(1:nrow(input[["rand_logs"]]), function(i) {
           r_data <- read.table(input[["rand_logs"]][["datapath"]][i], header = TRUE, comment.char = "#",
                                check.names = FALSE, stringsAsFactors = FALSE)
-          if (!param %in% names(r_data)) return(NULL)
+          if (!param %in% names(r_data)) {
+            stop(sprintf("Parameter '%s' not found in randomized log '%s'. All uploaded logs must contain the same parameter.", param, input[["rand_logs"]][["name"]][i]))
+          }
           
           r_start <- floor(nrow(r_data) * burnin_frac) + 1
           r_vals <- r_data[[param]][r_start:nrow(r_data)]
           r_hpd <- coda::HPDinterval(coda::as.mcmc(r_vals), prob = 0.95)
           
-          data.frame(
+        data.frame(
             Rep = paste("Randomized", sprintf("%02d", i)),
             Mean = mean(r_vals),
             Lower = r_hpd[1, 1],
