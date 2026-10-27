@@ -1,6 +1,6 @@
 Package: EvoTempo
 Type: Package
-Title: A Comprehensive Toolkit for Evaluating Temporal Signal in Phylodynamics
+Title: An Interactive Toolkit for Evaluating Temporal Signal in Measurably Evolving Populations
 Version: 1.0.0
 Authors@R: person(given = "Fangluan", family = "Gao", role = c("aut", "cre"), email = "rainby@fafu.edu.cn")
 Description: An interactive R/Shiny toolkit for evaluating temporal signal in
