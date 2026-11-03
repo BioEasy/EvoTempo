@@ -53,11 +53,14 @@ Provides an integrated workflow for generating and evaluating date-randomization
 The module supports:
 
 * **Standard permutation**
-* **Cluster-based permutation**
+* **User-defined clusters (CSV):** cluster-date permutation adapted from Murray et al. (2016), using uploaded cluster metadata such as that exported from Module 1. One source-cluster mapping is shared by all taxa in each destination cluster. For single-date clusters, a common date is retained within each cluster; for mixed-date clusters, original dates are sampled within the assigned source cluster, without averaging or rounding.
+* **Auto-cluster (Mclust on dates):** automatic grouping of XML sampling dates followed by independent outside-cluster date sampling adapted from TipDatingBeast `RandomCluster()`. No CSV is required. Dates can repeat and their overall frequencies can change. Date-only grouping is distinct from phylogenetic clustering and is not presented as equivalent control of temporal–genetic confounding.
 * BEAST 1.x and BEAST 2.x XML configuration generation.
 * MCMC log analysis and molecular-clock rate extraction.
 * Burn-in exclusion and 95% HPD calculation.
 * Evaluation according to the **CR1** and **CR2** criteria.
+
+The two cluster options are selected under **DRT strategy**. CSV-based randomization excludes the original date vector and duplicate date vectors and accepts each source-cluster mapping at most once. When fewer permutations are available than requested, the generator produces only the available number and notifies the user. The ZIP includes `randomization_info.txt` recording the chosen method and requested/generated counts. A one-cluster Mclust result prevents that strategy from running; it does not establish that phylogenetic sampling structure is absent.
 
 ### 4. Bayesian Evaluation of Temporal Signal (BETS)
 
