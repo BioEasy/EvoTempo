@@ -35,16 +35,16 @@ mod03_DRT_ui <- function(id) {
         textInput(ns("out_prefix"), "File Prefix", value = "DRT_rep"),
         
         hr(),
-        checkboxInput(ns("use_cluster_drt"), tags$b("Enable Cluster-based Permutation", style="color:#2E6A8C;"), value = FALSE),
+        checkboxInput(ns("use_cluster_drt"), tags$b("Enable Cluster-based DRT", style="color:#2E6A8C;"), value = FALSE),
         conditionalPanel(
           condition = sprintf("input['%s'] == true", ns("use_cluster_drt")),
           card(
             class = "bg-light mb-3",
             card_body(
               style = "padding: 10px;",
-              p("Required to control for temporal and genetic confounding detected in Mantel Test.", style="font-size:0.8em; margin-bottom: 10px;"),
-              radioButtons(ns("cluster_source"), "Cluster Definition:",
-                           choices = c("Upload Metadata CSV" = "csv",
+              p("Choose a clustering and randomization strategy. See 'How it works' for the difference between the two methods.", style="font-size:0.8em; margin-bottom: 10px;"),
+              radioButtons(ns("cluster_source"), "DRT strategy:",
+                           choices = c("User-defined clusters (CSV)" = "csv",
                                        "Auto-cluster (Mclust on dates)" = "mclust"),
                            selected = "csv"),
               conditionalPanel(
@@ -62,9 +62,9 @@ mod03_DRT_ui <- function(id) {
                             choices = c("E" = "E", "V" = "V"),
                             selected = "E"),
                 checkboxInput(ns("mclust_round"), "Round dates to nearest integer before clustering", value = FALSE),
-                helpText("TipDatingBeast uses model 'E' on raw dates by default.", style="font-size:0.75em;"),
+                helpText("The default here is model 'E' on raw dates.", style="font-size:0.75em;"),
                 helpText("Mclust requires a sufficient number of taxa (n >= 10 recommended).", style="font-size:0.75em;"),
-                helpText("If Mclust returns very few clusters, cluster-based DRT may approximate Standard DRT.",
+                helpText("At least two date clusters are required for this strategy. Date-only clustering does not assess phylogenetic sampling structure.",
                          style="font-size:0.75em; color:#8a6d3b;")
               )
             )
@@ -110,8 +110,9 @@ mod03_DRT_ui <- function(id) {
             tags$ul(
               tags$li("The engine automatically parses your BEAST 1.x or BEAST 2.x XML file."),
               tags$li(tags$strong("Standard Mode:"), " Completely randomizes all sampling dates (sampling without replacement)."),
-              tags$li(tags$strong("Cluster Mode:"), " Permutes dates in a way that avoids assigning a sequence a date from its own cluster, controlling for temporal and genetic confounding."),
-              tags$li(tags$strong("Cluster source options:"), " Upload a metadata CSV (e.g., exported from Module 1), or let the module auto-cluster the sampling dates with Mclust (as in TipDatingBeast)."),
+              tags$li(tags$strong("CSV clusters:"), " Upload cluster metadata (e.g., exported from Module 1). Dates are permuted among clusters using the approach of Murray et al. (2016). Single-date clusters retain a common date; for mixed-date clusters, each taxon draws an original date within its assigned source cluster."),
+              tags$li(tags$strong("Mclust clusters:"), " Automatically group the XML sampling dates without a CSV, then independently draw each taxon's date from observations outside its own date cluster, following TipDatingBeast RandomCluster (Rieux & Khatchikian, 2017). Dates may repeat and their overall frequencies may change. This differs from the CSV strategy."),
+              tags$li("The ZIP includes a short record of the selected strategy and the number of generated XML files. If fewer distinct CSV-based permutations are available, only that number is generated."),
               tags$li("All modified XML files are instantly compressed into a single ZIP archive for easy transfer to your computing cluster.")
             ),
             uiOutput(ns("xml_status_msg"))
@@ -232,6 +233,10 @@ mod03_DRT_server <- function(id, global_state) {
               
               t_col <- input[["taxon_col"]]
               c_col <- input[["cluster_col"]]
+              if (anyNA(meta_df[[t_col]]) || any(!nzchar(trimws(as.character(meta_df[[t_col]])))) ||
+                  anyDuplicated(meta_df[[t_col]])) {
+                stop("Cluster metadata must contain a non-empty, unique taxon name for each row.")
+              }
               
               match_idx <- match(xml_taxa, meta_df[[t_col]])
               if (any(is.na(match_idx))) {
@@ -266,7 +271,7 @@ mod03_DRT_server <- function(id, global_state) {
               
               n_found <- mclust_fit$G
               if (is.null(n_found) || n_found < 2) {
-                stop("Mclust found only one cluster. Standard DRT is more appropriate for this dataset.")
+                stop("Mclust found only one date cluster, so this strategy cannot run. Upload independently defined CSV clusters or consider Standard DRT.")
               }
               message(sprintf("Mclust selected G = %d (model = %s)", n_found, mclust_fit$modelName))
               
@@ -281,14 +286,16 @@ mod03_DRT_server <- function(id, global_state) {
             }
           }
           
+          cluster_method <- if (use_clust && identical(input[["cluster_source"]], "csv")) "murray" else "tipdatingbeast"
           if (exists("generate_randomized_xmls")) {
-            generate_randomized_xmls(
+            n_generated <- generate_randomized_xmls(
               xml_path = input[["base_xml"]][["datapath"]],
               out_dir = temp_dir,
               base_name = prefix,
               nreps = n_reps,
               use_clusters = use_clust,
-              clusters = clusters_aligned
+              clusters = clusters_aligned,
+              cluster_method = cluster_method
             )
           } else {
             stop("XML parsing engine not found. Ensure utils_xml.R is loaded.")
@@ -296,12 +303,45 @@ mod03_DRT_server <- function(id, global_state) {
           
           xml_files <- list.files(temp_dir, pattern = "\\.xml$", full.names = TRUE)
           if (length(xml_files) == 0) stop("XML generation failed. No files found.")
+          if (n_generated < n_reps) {
+            showNotification(sprintf("Only %d distinct non-original clustered date permutations are available; generated %d XML files instead of %d.",
+                                     n_generated, n_generated, n_reps), type = "warning", duration = 12)
+          }
+          strategy <- if (!use_clust) {
+            "Standard: sampling dates permuted across taxa without replacement"
+          } else if (cluster_method == "murray") {
+            "User-defined clusters (CSV): Murray et al. (2016) clustered permutation"
+          } else {
+            "Auto-cluster (Mclust on dates): TipDatingBeast-style outside-cluster sampling"
+          }
+          info <- c("EvoTempo DRT randomization", paste("Template:", input[["base_xml"]][["name"]]),
+                    paste("Strategy:", strategy), paste("Requested replicates:", n_reps),
+                    paste("Generated XML files:", n_generated))
+          if (use_clust) {
+            info <- c(info, paste("Number of clusters:", length(unique(clusters_aligned))))
+            if (cluster_method == "murray") {
+              mixed_dates <- any(tapply(xml_dates, clusters_aligned, function(x) length(unique(x))) > 1)
+              info <- c(info, paste("Cluster metadata:", input[["cluster_csv"]][["name"]]),
+                        paste("Taxon column:", input[["taxon_col"]]), paste("Cluster column:", input[["cluster_col"]]),
+                        paste("Mixed-date clusters:", mixed_dates),
+                        "One source-cluster permutation is shared by all taxa. Original dates are drawn within the assigned source cluster; dates are not averaged or rounded by the randomizer.",
+                        "Original date vectors and duplicate date vectors are excluded. Each accepted source-cluster mapping is used at most once.")
+              if (mixed_dates) showNotification("Some CSV clusters contain multiple dates. Each taxon draws an original date within its permuted source cluster; dates are not replaced by cluster means.",
+                                                type = "warning", duration = 12)
+            } else {
+              info <- c(info, paste("Mclust model:", input[["mclust_model"]]),
+                        paste("Maximum G:", input[["mclust_max_g"]]),
+                        paste("Round dates before clustering:", isTRUE(input[["mclust_round"]])),
+                        "Each taxon independently draws from original observations outside its own date cluster. Pools are not depleted; date frequencies may change.")
+            }
+          }
+          writeLines(info, file.path(temp_dir, "randomization_info.txt"))
           
           old_wd <- getwd()
           setwd(temp_dir)
           on.exit(setwd(old_wd))
           
-          zip::zip(zipfile = file, files = basename(xml_files))
+          zip::zip(zipfile = file, files = c(basename(xml_files), "randomization_info.txt"))
           
         }, error = function(e) {
           showNotification(paste("ZIP Export Error:", e$message), type = "error")
@@ -314,7 +354,7 @@ mod03_DRT_server <- function(id, global_state) {
     output$xml_status_msg <- renderUI({
       if (!is.null(input[["base_xml"]])) {
         mode_txt <- if (isTRUE(input[["use_cluster_drt"]])) {
-          if (identical(input[["cluster_source"]], "mclust")) "Cluster-based (Mclust)" else "Cluster-based (CSV)"
+          if (identical(input[["cluster_source"]], "mclust")) "Cluster-based (Mclust / TipDatingBeast sampling)" else "Cluster-based (CSV / Murray permutation)"
         } else {
           "Standard"
         }
