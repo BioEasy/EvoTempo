@@ -126,6 +126,14 @@ mod02_RTT_server <- function(id, global_state) {
     selected_clock_nodes <- reactiveVal(setNames(character(0), character(0)))
     raw_trait_data <- reactiveVal(NULL)
 
+    display_group <- function(x) {
+      labels <- as.character(x)
+      if (identical(input$grouping_mode, "local")) {
+        labels[!is.na(labels) & labels == "Global"] <- "Other"
+      }
+      labels
+    }
+
     get_group_palette <- function(groups) {
       lvls <- sort(unique(as.character(groups)))
       n <- length(lvls)
@@ -620,7 +628,7 @@ mod02_RTT_server <- function(id, global_state) {
 
             label_str <- sprintf(
               "%s: Rate = %.2e | tMRCA = %.0f | R² = %.3f",
-              grp, slope, tmrca, r_sq
+              display_group(grp), slope, tmrca, r_sq
             )
 
             return(data.frame(
@@ -666,7 +674,7 @@ mod02_RTT_server <- function(id, global_state) {
             card_body(
               class = "p-2",
               h6(
-                stats_df$Group[i],
+                display_group(stats_df$Group[i]),
                 class = "text-primary m-0 mb-1"
               ),
               div(
@@ -831,7 +839,8 @@ mod02_RTT_server <- function(id, global_state) {
           values = setNames(
             "#2E6A8C",
             unique(as.character(df$Group))
-          )
+          ),
+          labels = display_group
         )
 
         if (length(p$layers) >= 2) {
@@ -872,7 +881,10 @@ mod02_RTT_server <- function(id, global_state) {
 
 
       } else {
-        p <- p + scale_color_manual(values = get_group_palette(df$Group))
+        p <- p + scale_color_manual(
+          values = get_group_palette(df$Group),
+          labels = display_group
+        )
 
         if (!is_web && !is.null(annot_labels)) {
 
@@ -968,8 +980,10 @@ mod02_RTT_server <- function(id, global_state) {
       },
       content = function(file) {
         req(combined_plot_data())
+        export_df <- combined_plot_data()
+        export_df$Group <- display_group(export_df$Group)
         write.csv(
-          combined_plot_data(),
+          export_df,
           file,
           row.names = FALSE
         )
@@ -1126,7 +1140,6 @@ mod02_RTT_server <- function(id, global_state) {
             " (", df_internal$clade_group[is_local_int], ")"
           )
 
-          # Slightly enlarge the clicked clade root node(s)
           sel_nodes <- names(selected_clock_nodes())
           is_clicked_root <- as.character(df_internal$node) %in% sel_nodes & is_local_int
           int_sizes[is_clicked_root] <- 4.2
